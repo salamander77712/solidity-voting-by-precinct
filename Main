@@ -1,0 +1,74 @@
+pragma solidity >=0.5.0 <0.6.0;
+import "./ownable.sol";
+
+contract PrecinctVoting is Ownable{
+    
+    event precinctCandidateReport(uint16 precinctId, uint8 candidateId);
+    event precinctAdded(uint16 precinctId);
+    event precinctRemoved(uint16 precinctId);
+    event precinctValidated(uint16 precinctId);
+    
+    event candidateAdded(uint8 candidateId);
+    event candidateRemoved(uint8 candidateId);
+    event candidateValidated(uint8 candidateId);
+    
+    struct Precinct{
+        string name;
+        uint16 voteId;
+        bool invalid;
+    }
+    
+    struct Candidate{
+        string name;
+        uint16 votes;
+        bool invalid;
+    }
+    
+    Precinct[] public precincts;
+    Candidate[] public candidates;
+    
+    uint8[] public candidateReporting;
+    
+    mapping (uint16 => address) precinctToOwner;
+    
+    function createPrecinct(string memory name, address owner) public onlyOwner{
+        uint16 id = uint16(precincts.push(Precinct(name, 0, false)) - 1);
+        precinctToOwner[id] = owner;
+        emit precinctAdded(id);
+    }
+    function createCandidate(string memory name) public onlyOwner{
+        uint8 id = uint8(candidates.push(Candidate(name,0,false)) - 1);
+        emit candidateAdded(id);
+    }
+    function removePrecinct(uint16 id) public onlyOwner{
+        precincts[id].invalid = true;
+        emit precinctRemoved(id);
+    }
+    function removeCandidate(uint8 id) public onlyOwner{
+        candidates[id].invalid = true;
+        emit candidateRemoved(id);
+    }
+    function validatePrecinct(uint16 id) public onlyOwner{
+        if(precincts[id].voteId > 0){
+            candidates[candidateReporting[precincts[id].voteId]].votes --;
+        }
+        precincts[id].invalid = false;
+        emit precinctValidated(id);
+    }
+    function validateCandidate(uint8 id) public onlyOwner{
+        candidates[id].invalid = false;
+        emit candidateValidated(id);
+    }
+    function precinctReport(uint16 precinctId, uint8 candidateId) public{
+        require(precinctToOwner[precinctId] == msg.sender);
+        require(precincts[precinctId].invalid == false);
+        require(candidates[candidateId].invalid == false);
+        precincts[precinctId].voteId = uint16(candidateReporting.push(candidateId));
+        candidates[candidateId].votes ++;
+        precincts[precinctId].invalid = true;
+        emit precinctCandidateReport(precinctId, candidateId);
+    }
+    function viewResults(uint id) external view returns(uint8){
+        return(candidateReporting[precincts[id].voteId]);
+    }
+}
